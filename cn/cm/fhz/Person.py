@@ -14,6 +14,8 @@ bee = Person()
 
 foo.setName("foo")
 
+print 'ceshi '
+
 bee.setName("bee")
 
 foo.greet()

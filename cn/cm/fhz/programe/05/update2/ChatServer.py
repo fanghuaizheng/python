@@ -64,7 +64,7 @@ class LoginRoom(Room):
         session.push('Please login \nUse<nick> \r\n')
 
     def do_login(self,session,line):
-        name = line.strip
+        name = line.strip()
         if not name:
             session.push('please enter a name')
         elif name in self.server.users:
@@ -87,7 +87,8 @@ class ChatRoom(Room):
         self.broadcast(session.name+'has out this room \r\n')
 
     def do_say(self,session,line):
-        self.broadcast(session.name+": "+line+"\r\n")
+        say = session.name+": "+line+"\r\n"
+        self.broadcast(say)
     def do_look(self,session,line):
         #处理look命令，这个命令是查看谁在房间
         session.push('the following are in this room \r\n')
@@ -139,7 +140,7 @@ class ChatSession(async_chat):
             self.handle_close()
     def handle_close(self):
         async_chat.handle_close(self)
-        self.enter(LoginRoom(self.server))
+        self.enter(LogoutRoom(self.server))
 
 class ChatServer(dispatcher):
     """

@@ -1,4 +1,6 @@
+#coding=utf-8
 from asyncore import dispatcher
+
 import socket,asyncore
 
 PORT = 5005

@@ -23,7 +23,8 @@ class CommandHandler:
             line = parts[1].strip()
         except IndexError:
             line = ''
-        meth = getattr(self,'do_'+cmd,None)
+        mname = 'do_'+cmd
+        meth = getattr(self,mname,None)
         try:
             meth(session,line)
         except TypeError:
@@ -33,7 +34,7 @@ class CommandHandler:
 
 class Room(CommandHandler):
     """
-    包括一个活着多个用户的范型环境，负责基本的命令处理与广播
+    包括一个或者多个用户的范型环境，负责基本的命令处理与广播
     """
     def __init__(self,server):
         self.server = server
@@ -53,6 +54,27 @@ class Room(CommandHandler):
         raise EndSession
 
 class LoginRoom(Room):
+    """
+    为刚连接上的用户准备房间
+    """
+    def add(self,session):
+        Room.add(self,session)
+        self.broadcast('Welcome to %s \r\n'%self.server.name)
+    def unknown(self,session,cmd):
+        session.push('Please login \nUse<nick> \r\n')
+
+    def do_login(self,session,line):
+        name = line.strip
+        if not name:
+            session.push('please enter a name')
+        elif name in self.server.users:
+            session.push('this name is used')
+            session.push('please try other name')
+        else:
+            session.name = name
+            session.enter(self.server.main_room)
+
+class ChatRoom(Room):
     """
     为刚链接上的用户准备房间
     """
@@ -84,7 +106,65 @@ class LogoutRoom(Room):
         try:
             del self.server.users[session.name]
         except KeyError:pass
+class ChatSession(async_chat):
+    """
+    单会话，负责与用户的通信
+    """
+    def __init__(self,server,sock):
+        async_chat.__init__(self,sock)
+        self.server = server
+        self.set_terminator('\r\n')
+        self.data = []
+        self.name = None
+        #所有的会话都开始于一个单独的房间
+        self.enter(LoginRoom(server))
 
+    def enter(self,room):
+        #从当前房间移除自身，并且将自身加入到下一个房间
+        try:
+            cur = self.room
+        except AttributeError:
+            pass
+        else:cur.remove(self)
+        self.room = room
+        room.add(self)
+    def collect_incoming_data(self, data):
+        self.data.append(data)
+    def found_terminator(self):
+        line = ''.join(self.data)
+        self.data = []
+        try:
+            self.room.handler(self,line)
+        except EndSession:
+            self.handle_close()
+    def handle_close(self):
+        async_chat.handle_close(self)
+        self.enter(LoginRoom(self.server))
+
+class ChatServer(dispatcher):
+    """
+    只有一个房间的聊天器
+    """
+    def __init__(self,port,name):
+        dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.set_reuse_addr()
+        self.bind(('',port))
+        self.listen(5)
+        self.name = name
+        self.users = {}
+        self.main_room = ChatRoom(self)
+
+    def handle_accept(self):
+        conn,addr =self.accept()
+        ChatSession(self,conn)
+
+if __name__=='__main__':
+    s = ChatServer(PORT,NAME)
+    try:
+        asyncore.loop()
+    except KeyboardInterrupt:
+        print '停止'
 
 
 

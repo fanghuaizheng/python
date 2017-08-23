@@ -11,7 +11,7 @@ class CommandHandler:
     """
     类似与标准库中的cmd.Cmd的简单命令处理
     """
-    def unknown(self,session,cmd):
+    def unknown(self,session,cmd,line):
         session.push('unknown command: %s \r\n' %cmd)
 
     def handler(self,session,line):
@@ -22,14 +22,14 @@ class CommandHandler:
         try:
             line = parts[1].strip()
         except IndexError:
-            line = ''
+            line = parts[0].strip()
         mname = 'do_'+cmd
         meth = getattr(self,mname,None)
         try:
             meth(session,line)
         except TypeError:
             #如果不可以调用，此段代码相应位置命令
-            self.unknown(session,cmd)
+            self.unknown(session,cmd,line)
 
 
 class Room(CommandHandler):
@@ -60,7 +60,7 @@ class LoginRoom(Room):
     def add(self,session):
         Room.add(self,session)
         self.broadcast('Welcome to %s \r\n'%self.server.name)
-    def unknown(self,session,cmd):
+    def unknown(self,session,cmd,line):
         session.push('Please login \nUse<nick> \r\n')
 
     def do_login(self,session,line):
@@ -79,12 +79,17 @@ class ChatRoom(Room):
     为刚链接上的用户准备房间
     """
     def add(self,session):
-        self.broadcast(session.name+'has entered the room \r\n')
+        self.broadcast(session.name+' has entered the room \r\n')
         self.server.users[session.name] = session
         Room.add(self,session)
     def remove(self,session):
         Room.remove(self,session)
-        self.broadcast(session.name+'has out this room \r\n')
+        self.broadcast(session.name+' has out this room \r\n')
+
+    def unknown(self,session,cmd,line):
+        say = session.name+": "+line+"\r\n"
+        self.broadcast(say)
+
 
     def do_say(self,session,line):
         say = session.name+": "+line+"\r\n"
